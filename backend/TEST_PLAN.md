@@ -11,6 +11,18 @@ Testing focused on the properties the brief marked interview-critical: **concurr
 **Result:** 5/5 tests passing.
 
 ---
+### 🚀 Running the Test Suite
+
+These integration tests run against a live PostgreSQL instance with Flyway migrations applied.
+
+To execute the suite locally:
+
+```bash```
+# Using Maven wrapper (with spring profile or DB overrides if applicable)
+./mvnw test -Dtest=DispatchMatchingIntegrationTest
+
+# Or if using Gradle:
+./gradlew test --tests DispatchMatchingIntegrationTest
 
 ## Test 1 — Concurrency-safe claiming
 
