@@ -13,9 +13,11 @@ import java.util.UUID;
 public class RideRequestService {
 
     private final RideRequestRepository rideRequestRepository;
+    private final MatchingService matchingService;
 
-    public RideRequestService(RideRequestRepository rideRequestRepository) {
+    public RideRequestService(RideRequestRepository rideRequestRepository, MatchingService matchingService) {
         this.rideRequestRepository = rideRequestRepository;
+        this.matchingService = matchingService;
     }
 
     public RideRequest create(CreateRideRequest request) {
@@ -24,7 +26,11 @@ public class RideRequestService {
                 request.dropoffLat(), request.dropoffLng()
         );
         rideRequest.setStatus(RequestStatus.SEARCHING);
-        return rideRequestRepository.save(rideRequest);
+        rideRequest = rideRequestRepository.save(rideRequest);
+
+        matchingService.match(rideRequest.getId());
+
+        return rideRequestRepository.findById(rideRequest.getId()).orElseThrow();
     }
 
     public RideRequest getById(UUID id) {

@@ -41,7 +41,10 @@ public class Assignment {
     public Driver getDriver() { return driver; }
     public AssignmentStatus getStatus() { return status; }
     public void setStatus(AssignmentStatus status) { this.status = status; }
+    public LocalDateTime getReservedAt() { return reservedAt; }
     public LocalDateTime getExpiresAt() { return expiresAt; }
     public LocalDateTime getConfirmedAt() { return confirmedAt; }
     public void setConfirmedAt(LocalDateTime confirmedAt) { this.confirmedAt = confirmedAt; }
+    public String getFailureReason() { return failureReason; }
+    public void setFailureReason(String failureReason) { this.failureReason = failureReason; }
 }
