@@ -40,10 +40,11 @@ public class ReassignmentScheduler {
             assignment.setFailureReason("Driver did not confirm before expiry");
             assignmentRepository.save(assignment);
 
-            Driver driver = assignment.getDriver();
+            Driver driver = driverRepository.findById(assignment.getDriver().getId())
+                    .orElseThrow(() -> new IllegalStateException("Driver not found: " + assignment.getDriver().getId()));
             if (driver.getStatus() == DriverStatus.RESERVED) {
                 driver.setStatus(DriverStatus.AVAILABLE);
-                driverRepository.save(driver);
+                driverRepository.saveAndFlush(driver);
             }
 
             RideRequest request = assignment.getRequest();
