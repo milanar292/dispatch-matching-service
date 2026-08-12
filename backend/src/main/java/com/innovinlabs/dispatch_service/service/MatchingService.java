@@ -87,8 +87,13 @@ public class MatchingService {
         candidates.removeIf(d -> d.getLocationUpdatedAt() == null
                 || d.getLocationUpdatedAt().isBefore(staleThreshold));
 
-        candidates.sort(Comparator.comparingDouble(d ->
-                distanceKm(request.getPickupLat(), request.getPickupLng(), d.getLatitude(), d.getLongitude())));
+        candidates.sort(
+                Comparator.comparingDouble((Driver d) ->
+                                distanceKm(request.getPickupLat(), request.getPickupLng(), d.getLatitude(), d.getLongitude()))
+                        // Tie-breaker: when two drivers are equally close, the one who's been
+                        // AVAILABLE longest wins — spreads work around instead of one driver
+                        // always winning ties near a busy pickup point.
+                        .thenComparing(Driver::getAvailableSince, Comparator.nullsFirst(Comparator.naturalOrder())));
 
         return candidates;
     }
