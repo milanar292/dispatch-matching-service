@@ -88,6 +88,9 @@ class DispatchMatchingIntegrationTest {
         int result2 = f2.get(5, TimeUnit.SECONDS);
         executor.shutdown();
 
+        System.out.println("Thread 1 result: " + result1);
+        System.out.println("Thread 2 result: " + result2);
+
         assertEquals(1, result1 + result2,
                 "Exactly one of the two concurrent reservation attempts should succeed");
 

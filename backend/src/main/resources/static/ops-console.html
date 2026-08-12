@@ -1,0 +1,667 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>Dispatch Console</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;600;700&family=IBM+Plex+Mono:wght@400;500;600&display=swap" rel="stylesheet">
+<style>
+  :root{
+    --void:#0A0E14;
+    --panel:#12171F;
+    --panel-alt:#171E28;
+    --border:#232B38;
+    --border-soft:#1B2230;
+    --text:#E3E8EF;
+    --text-dim:#7C8798;
+    --text-faint:#4B5566;
+    --cyan:#22D3C7;
+    --amber:#F2A93B;
+    --red:#E5484D;
+    --green:#3DD68C;
+    --violet:#A78BFA;
+    --font-display:'Space Grotesk', 'Segoe UI', system-ui, sans-serif;
+    --font-mono:'IBM Plex Mono', 'Consolas', monospace;
+  }
+  *{ box-sizing: border-box; }
+  html,body{ height:100%; }
+  body{
+    margin:0;
+    background:
+      radial-gradient(ellipse 1200px 600px at 50% -10%, rgba(34,211,199,0.06), transparent),
+      var(--void);
+    color:var(--text);
+    font-family:var(--font-mono);
+    font-size:13px;
+    line-height:1.5;
+  }
+  .console{ display:flex; flex-direction:column; min-height:100vh; }
+
+  /* ---------- Topbar ---------- */
+  .topbar{
+    display:flex;
+    align-items:center;
+    gap:20px;
+    padding:14px 24px;
+    border-bottom:1px solid var(--border);
+    background:rgba(18,23,31,0.7);
+    backdrop-filter: blur(6px);
+    position:sticky;
+    top:0;
+    z-index:10;
+  }
+  .topbar h1{
+    font-family:var(--font-display);
+    font-size:15px;
+    font-weight:700;
+    letter-spacing:0.06em;
+    margin:0;
+    color:var(--text);
+    text-transform:uppercase;
+  }
+  .topbar h1 span{ color:var(--text-faint); font-weight:500; }
+  .live-indicator{
+    display:flex; align-items:center; gap:7px;
+    font-size:11px; letter-spacing:0.05em; text-transform:uppercase;
+    color:var(--text-dim);
+    margin-left:auto;
+  }
+  .dot{
+    width:7px; height:7px; border-radius:50%;
+    background:var(--green);
+    box-shadow:0 0 0 0 rgba(61,214,140,0.6);
+    animation:pulse 2s infinite;
+  }
+  .dot.off{ background:var(--text-faint); animation:none; box-shadow:none; }
+  @keyframes pulse{
+    0%{ box-shadow:0 0 0 0 rgba(61,214,140,0.5); }
+    70%{ box-shadow:0 0 0 6px rgba(61,214,140,0); }
+    100%{ box-shadow:0 0 0 0 rgba(61,214,140,0); }
+  }
+  .poll-info{ font-size:11px; color:var(--text-faint); }
+  button.ghost{
+    background:transparent;
+    border:1px solid var(--border);
+    color:var(--text-dim);
+    font-family:var(--font-mono);
+    font-size:11px;
+    padding:5px 10px;
+    border-radius:4px;
+    cursor:pointer;
+    letter-spacing:0.03em;
+    text-transform:uppercase;
+    transition:border-color .15s, color .15s;
+  }
+  button.ghost:hover{ border-color:var(--cyan); color:var(--cyan); }
+
+  /* ---------- Grid ---------- */
+  .grid{
+    display:grid;
+    grid-template-columns: 300px 1fr 340px;
+    gap:1px;
+    background:var(--border);
+    flex:1;
+  }
+  @media (max-width: 980px){
+    .grid{ grid-template-columns: 1fr; }
+  }
+  .panel{
+    background:var(--void);
+    padding:18px 20px 24px;
+    overflow-y:auto;
+  }
+  .panel-head{
+    display:flex;
+    align-items:baseline;
+    justify-content:space-between;
+    margin-bottom:14px;
+    padding-bottom:10px;
+    border-bottom:1px solid var(--border-soft);
+  }
+  .panel-head h2{
+    font-family:var(--font-display);
+    font-size:12px;
+    font-weight:600;
+    letter-spacing:0.09em;
+    text-transform:uppercase;
+    color:var(--text);
+    margin:0;
+  }
+  .panel-head .count{
+    font-size:11px;
+    color:var(--text-faint);
+  }
+
+  /* ---------- Status pills ---------- */
+  .pill{
+    display:inline-flex;
+    align-items:center;
+    gap:5px;
+    font-size:10px;
+    font-weight:600;
+    letter-spacing:0.04em;
+    text-transform:uppercase;
+    padding:3px 8px;
+    border-radius:20px;
+    border:1px solid transparent;
+    white-space:nowrap;
+  }
+  .pill::before{ content:''; width:5px; height:5px; border-radius:50%; background:currentColor; }
+  .pill.st-available, .pill.st-confirmed, .pill.st-completed{ color:var(--green); background:rgba(61,214,140,0.1); border-color:rgba(61,214,140,0.25); }
+  .pill.st-reserved, .pill.st-searching, .pill.st-requested, .pill.st-driver_reserved, .pill.st-assignment_sent, .pill.st-rematching{ color:var(--amber); background:rgba(242,169,59,0.1); border-color:rgba(242,169,59,0.25); }
+  .pill.st-offline, .pill.st-disconnected, .pill.st-no_driver_available, .pill.st-cancelled{ color:var(--text-dim); background:rgba(124,135,152,0.1); border-color:rgba(124,135,152,0.2); }
+  .pill.st-busy{ color:var(--violet); background:rgba(167,139,250,0.1); border-color:rgba(167,139,250,0.25); }
+  .pill.st-timed_out{ color:var(--red); background:rgba(229,72,77,0.1); border-color:rgba(229,72,77,0.25); }
+
+  .stale-flag{
+    font-size:9px; color:var(--red); border:1px solid rgba(229,72,77,0.35);
+    background:rgba(229,72,77,0.08); padding:2px 6px; border-radius:3px;
+    letter-spacing:0.04em; text-transform:uppercase;
+  }
+
+  /* ---------- Fleet ---------- */
+  .driver-card{
+    padding:10px 0;
+    border-bottom:1px solid var(--border-soft);
+  }
+  .driver-card:last-child{ border-bottom:none; }
+  .driver-row1{ display:flex; align-items:center; justify-content:space-between; margin-bottom:5px; }
+  .driver-name{ font-family:var(--font-display); font-weight:600; font-size:12.5px; }
+  .driver-meta{ color:var(--text-faint); font-size:11px; display:flex; gap:10px; flex-wrap:wrap; }
+  .driver-id{ color:var(--text-faint); font-size:10px; cursor:help; }
+
+  /* ---------- Tracker ---------- */
+  .field-label{
+    font-size:10px; text-transform:uppercase; letter-spacing:0.07em;
+    color:var(--text-faint); margin-bottom:5px; display:block;
+  }
+  .field-group{ margin-bottom:12px; }
+  input[type=text], input[type=number]{
+    width:100%;
+    background:var(--panel-alt);
+    border:1px solid var(--border);
+    color:var(--text);
+    font-family:var(--font-mono);
+    font-size:12px;
+    padding:8px 10px;
+    border-radius:4px;
+    outline:none;
+    transition:border-color .15s;
+  }
+  input:focus{ border-color:var(--cyan); }
+  .coord-grid{ display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  button.primary{
+    width:100%;
+    background:var(--cyan);
+    color:#04231F;
+    border:none;
+    font-family:var(--font-display);
+    font-weight:700;
+    font-size:12px;
+    letter-spacing:0.03em;
+    text-transform:uppercase;
+    padding:10px;
+    border-radius:4px;
+    cursor:pointer;
+    transition:filter .15s;
+  }
+  button.primary:hover{ filter:brightness(1.1); }
+  button.primary:disabled{ opacity:0.4; cursor:not-allowed; }
+  button.secondary{
+    width:100%;
+    background:transparent;
+    color:var(--text-dim);
+    border:1px solid var(--border);
+    font-family:var(--font-mono);
+    font-size:11px;
+    padding:8px;
+    border-radius:4px;
+    cursor:pointer;
+    margin-top:6px;
+  }
+  button.secondary:hover{ border-color:var(--text-dim); color:var(--text); }
+  .divider-label{
+    text-align:center; color:var(--text-faint); font-size:10px;
+    letter-spacing:0.08em; text-transform:uppercase; margin:16px 0;
+    display:flex; align-items:center; gap:10px;
+  }
+  .divider-label::before, .divider-label::after{ content:''; flex:1; height:1px; background:var(--border-soft); }
+
+  .tracked-card{
+    margin-top:18px; padding:14px; background:var(--panel);
+    border:1px solid var(--border); border-radius:6px;
+  }
+  .tracked-card .row{ display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; font-size:11px; }
+  .tracked-card .row:last-child{ margin-bottom:0; }
+  .tracked-card .k{ color:var(--text-faint); }
+  .tracked-card .v{ color:var(--text); }
+
+  .empty-note{ color:var(--text-faint); font-size:11px; padding:6px 0; }
+
+  /* ---------- Comparison ---------- */
+  .compare-wrap{ margin-top:16px; }
+  .compare-cols{ display:grid; grid-template-columns:1fr 1fr; gap:10px; margin-top:10px; }
+  .compare-col h3{
+    font-family:var(--font-display); font-size:10.5px; letter-spacing:0.06em;
+    text-transform:uppercase; margin:0 0 8px; display:flex; align-items:center; gap:6px;
+  }
+  .compare-col.speed h3{ color:var(--cyan); }
+  .compare-col.quality h3{ color:var(--violet); }
+  .rank-card{
+    border:1px solid var(--border); border-radius:5px; padding:8px;
+    margin-bottom:6px; font-size:10.5px; background:var(--panel);
+  }
+  .rank-card .rank-num{ color:var(--text-faint); font-size:9px; }
+  .rank-card .id{ color:var(--text); font-size:10px; }
+  .rank-card .metric{ color:var(--text-dim); margin-top:3px; }
+  .rank-card.top-pick{ border-color:var(--green); }
+  .differs-banner{
+    margin-top:12px; padding:8px 10px; border-radius:5px; font-size:11px;
+    text-align:center; letter-spacing:0.02em;
+  }
+  .differs-banner.yes{ background:rgba(242,169,59,0.1); border:1px solid rgba(242,169,59,0.3); color:var(--amber); }
+  .differs-banner.no{ background:rgba(124,135,152,0.08); border:1px solid var(--border); color:var(--text-dim); }
+
+  /* ---------- Ledger ---------- */
+  .ledger-item{
+    padding:10px 0; border-bottom:1px solid var(--border-soft);
+  }
+  .ledger-item:last-child{ border-bottom:none; }
+  .ledger-row1{ display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; }
+  .ledger-ids{ font-size:10px; color:var(--text-faint); margin-bottom:6px; }
+  .ledger-ids b{ color:var(--text-dim); font-weight:500; }
+  .countdown{
+    font-family:var(--font-mono); font-size:11px; font-weight:600;
+    padding:3px 8px; border-radius:4px; display:inline-block;
+  }
+  .countdown.safe{ color:var(--green); background:rgba(61,214,140,0.08); }
+  .countdown.warn{ color:var(--amber); background:rgba(242,169,59,0.1); }
+  .countdown.danger{ color:var(--red); background:rgba(229,72,77,0.12); animation:blink 1s infinite; }
+  .countdown.done{ color:var(--text-faint); background:rgba(124,135,152,0.08); }
+  @keyframes blink{ 50%{ opacity:0.5; } }
+
+  ::-webkit-scrollbar{ width:8px; }
+  ::-webkit-scrollbar-thumb{ background:var(--border); border-radius:4px; }
+  ::-webkit-scrollbar-track{ background:transparent; }
+
+  .toast{
+    position:fixed; bottom:20px; left:50%; transform:translateX(-50%);
+    background:var(--panel); border:1px solid var(--border); color:var(--text);
+    padding:10px 16px; border-radius:6px; font-size:11px; z-index:100;
+    opacity:0; transition:opacity .25s; pointer-events:none;
+  }
+  .toast.show{ opacity:1; }
+  .toast.err{ border-color:rgba(229,72,77,0.4); color:var(--red); }
+
+  @media (prefers-reduced-motion: reduce){
+    .dot, .countdown.danger{ animation:none; }
+  }
+</style>
+</head>
+<body>
+<div class="console">
+
+  <div class="topbar">
+    <h1>Dispatch Console <span>/ live ops</span></h1>
+    <div class="live-indicator">
+      <span class="dot" id="liveDot"></span>
+      <span id="liveLabel">polling</span>
+      <span class="poll-info" id="lastPoll">—</span>
+    </div>
+    <button class="ghost" id="pauseBtn">Pause</button>
+  </div>
+
+  <div class="grid">
+
+    <!-- FLEET -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Fleet</h2>
+        <span class="count" id="fleetCount">0 drivers</span>
+      </div>
+      <div id="fleetList"></div>
+    </section>
+
+    <!-- TRACKER -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Request Tracker</h2>
+      </div>
+
+      <div class="field-label">Create a request</div>
+      <div class="field-group">
+        <input type="text" id="riderId" placeholder="rider id (e.g. rider-1)" value="rider-live-demo" />
+      </div>
+      <div class="field-group coord-grid">
+        <input type="number" step="any" id="pickupLat" placeholder="pickup lat" value="13.90" />
+        <input type="number" step="any" id="pickupLng" placeholder="pickup lng" value="78.90" />
+      </div>
+      <div class="field-group coord-grid">
+        <input type="number" step="any" id="dropoffLat" placeholder="dropoff lat" value="14.00" />
+        <input type="number" step="any" id="dropoffLng" placeholder="dropoff lng" value="79.00" />
+      </div>
+      <button class="primary" id="createBtn">Create request</button>
+
+      <div class="divider-label">or track existing</div>
+      <div class="field-group">
+        <input type="text" id="trackId" placeholder="paste request id (uuid)" />
+      </div>
+      <button class="secondary" id="trackBtn">Track by id</button>
+
+      <div id="trackedWrap"></div>
+    </section>
+
+    <!-- LEDGER -->
+    <section class="panel">
+      <div class="panel-head">
+        <h2>Assignment Ledger</h2>
+        <span class="count" id="ledgerCount">0 active</span>
+      </div>
+      <div id="ledgerList"></div>
+    </section>
+
+  </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script>
+(() => {
+  const STALE_MS = 180000; // matches backend's 180s staleness threshold
+  const POLL_MS = 3000;
+
+  const state = {
+    drivers: [],
+    assignments: [],
+    trackedRequest: null,
+    comparison: null,
+    paused: false,
+    timer: null,
+  };
+
+  const $ = (id) => document.getElementById(id);
+
+  function toast(msg, isErr){
+    const t = $('toast');
+    t.textContent = msg;
+    t.className = 'toast show' + (isErr ? ' err' : '');
+    setTimeout(() => t.classList.remove('show'), 3200);
+  }
+
+  async function api(path, opts){
+    const res = await fetch(path, Object.assign({
+      headers: {'Content-Type':'application/json'}
+    }, opts));
+    let body = null;
+    try { body = await res.json(); } catch(e) {}
+    if(!res.ok){
+      const msg = (body && (body.message || body.error)) || `${res.status} ${res.statusText}`;
+      throw new Error(msg);
+    }
+    return body;
+  }
+
+  function shortId(id){
+    if(!id) return '—';
+    return id.slice(0,8);
+  }
+
+  function statusClass(status){
+    return 'st-' + (status || '').toLowerCase();
+  }
+
+  function fmtCoord(v){
+    return typeof v === 'number' ? v.toFixed(4) : '—';
+  }
+
+  function msSince(iso){
+    if(!iso) return Infinity;
+    return Date.now() - new Date(iso).getTime();
+  }
+
+  function msUntil(iso){
+    if(!iso) return null;
+    return new Date(iso).getTime() - Date.now();
+  }
+
+  // ---------- Rendering ----------
+
+  function renderFleet(){
+    const list = $('fleetList');
+    $('fleetCount').textContent = `${state.drivers.length} driver${state.drivers.length===1?'':'s'}`;
+    if(state.drivers.length === 0){
+      list.innerHTML = `<div class="empty-note">No drivers registered yet.</div>`;
+      return;
+    }
+    list.innerHTML = state.drivers.map(d => {
+      const stale = d.locationUpdatedAt && msSince(d.locationUpdatedAt) > STALE_MS;
+      return `
+        <div class="driver-card">
+          <div class="driver-row1">
+            <span class="driver-name">${escapeHtml(d.name)}</span>
+            <span class="pill ${statusClass(d.status)}">${d.status}</span>
+          </div>
+          <div class="driver-meta">
+            <span class="driver-id" title="${d.id}">#${shortId(d.id)}</span>
+            <span>${fmtCoord(d.latitude)}, ${fmtCoord(d.longitude)}</span>
+            ${stale ? '<span class="stale-flag">stale</span>' : ''}
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function renderLedger(){
+    const list = $('ledgerList');
+    const active = state.assignments.filter(a => a.status === 'RESERVED' || a.status === 'ASSIGNMENT_SENT');
+    $('ledgerCount').textContent = `${active.length} active`;
+
+    if(state.assignments.length === 0){
+      list.innerHTML = `<div class="empty-note">No assignments yet.</div>`;
+      return;
+    }
+    const sorted = [...state.assignments].sort((a,b) => new Date(b.reservedAt) - new Date(a.reservedAt));
+    list.innerHTML = sorted.slice(0, 25).map(a => {
+      let countdownHtml = '';
+      if(a.status === 'RESERVED' || a.status === 'ASSIGNMENT_SENT'){
+        const remaining = msUntil(a.expiresAt);
+        if(remaining === null){
+          countdownHtml = '';
+        } else if(remaining <= 0){
+          countdownHtml = `<span class="countdown danger">expired · awaiting reassign</span>`;
+        } else {
+          const secs = Math.ceil(remaining/1000);
+          const cls = secs <= 10 ? 'danger' : secs <= 30 ? 'warn' : 'safe';
+          countdownHtml = `<span class="countdown ${cls}">${secs}s to expiry</span>`;
+        }
+      } else {
+        countdownHtml = `<span class="countdown done">${a.status === 'CONFIRMED' ? 'confirmed' : 'closed'}</span>`;
+      }
+      return `
+        <div class="ledger-item">
+          <div class="ledger-row1">
+            <span class="pill ${statusClass(a.status)}">${a.status}</span>
+            ${countdownHtml}
+          </div>
+          <div class="ledger-ids">
+            <b>req</b> <span title="${a.requestId}">#${shortId(a.requestId)}</span>
+            &nbsp;→&nbsp;
+            <b>drv</b> <span title="${a.driverId}">#${shortId(a.driverId)}</span>
+          </div>
+        </div>`;
+    }).join('');
+  }
+
+  function renderTracked(){
+    const wrap = $('trackedWrap');
+    if(!state.trackedRequest){
+      wrap.innerHTML = '';
+      return;
+    }
+    const r = state.trackedRequest;
+    wrap.innerHTML = `
+      <div class="tracked-card">
+        <div class="row"><span class="k">request</span><span class="v" title="${r.id}">#${shortId(r.id)}</span></div>
+        <div class="row"><span class="k">rider</span><span class="v">${escapeHtml(r.riderId)}</span></div>
+        <div class="row"><span class="k">status</span><span class="pill ${statusClass(r.status)}">${r.status}</span></div>
+        <div class="row"><span class="k">pickup</span><span class="v">${fmtCoord(r.pickupLat)}, ${fmtCoord(r.pickupLng)}</span></div>
+      </div>
+      <button class="secondary" id="compareBtn">Compare speed vs quality</button>
+      <div id="compareWrap"></div>
+    `;
+    $('compareBtn').onclick = runComparison;
+    renderComparison();
+  }
+
+  function renderComparison(){
+    const wrap = $('compareWrap');
+    if(!wrap) return;
+    if(!state.comparison){
+      wrap.innerHTML = '';
+      return;
+    }
+    const c = state.comparison;
+    const renderList = (arr, kind) => {
+      if(!arr || arr.length === 0) return `<div class="empty-note">No eligible drivers.</div>`;
+      return arr.map(d => {
+        const isTop = d.rank === 1;
+        const metric = kind === 'quality'
+          ? `${d.etaMinutes != null ? d.etaMinutes.toFixed(1)+'min' : '—'} · ${d.trafficLevel || '—'}`
+          : `${d.distanceKm.toFixed(2)} km`;
+        return `
+          <div class="rank-card ${isTop ? 'top-pick' : ''}">
+            <div class="rank-num">#${d.rank}</div>
+            <div class="id" title="${d.driverId}">${shortId(d.driverId)}</div>
+            <div class="metric">${metric}${kind==='quality' ? ` · ${d.distanceKm.toFixed(2)} km` : ''}</div>
+          </div>`;
+      }).join('');
+    };
+    wrap.innerHTML = `
+      <div class="compare-wrap">
+        <div class="compare-cols">
+          <div class="compare-col speed">
+            <h3>Speed (nearest)</h3>
+            ${renderList(c.speedOrder, 'speed')}
+          </div>
+          <div class="compare-col quality">
+            <h3>Quality (ETA)</h3>
+            ${renderList(c.qualityOrder, 'quality')}
+          </div>
+        </div>
+        <div class="differs-banner ${c.topPickDiffers ? 'yes' : 'no'}">
+          ${c.topPickDiffers ? 'Top pick differs between strategies' : 'Top pick agrees — nearest driver also wins on ETA'}
+        </div>
+      </div>
+    `;
+  }
+
+  function escapeHtml(s){
+    if(s == null) return '';
+    return String(s).replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]));
+  }
+
+  // ---------- Actions ----------
+
+  async function createRequest(){
+    const btn = $('createBtn');
+    btn.disabled = true;
+    try{
+      const body = {
+        riderId: $('riderId').value || 'rider-live-demo',
+        pickupLat: parseFloat($('pickupLat').value),
+        pickupLng: parseFloat($('pickupLng').value),
+        dropoffLat: parseFloat($('dropoffLat').value),
+        dropoffLng: parseFloat($('dropoffLng').value),
+      };
+      const created = await api('/requests', { method:'POST', body: JSON.stringify(body) });
+      state.trackedRequest = created;
+      state.comparison = null;
+      renderTracked();
+      toast(`Request created — ${created.status}`);
+      await refreshAssignments();
+    } catch(e){
+      toast(e.message, true);
+    } finally {
+      btn.disabled = false;
+    }
+  }
+
+  async function trackById(){
+    const id = $('trackId').value.trim();
+    if(!id) return;
+    try{
+      const r = await api(`/requests/${id}`);
+      state.trackedRequest = r;
+      state.comparison = null;
+      renderTracked();
+      toast(`Tracking request ${shortId(id)}`);
+    } catch(e){
+      toast(e.message, true);
+    }
+  }
+
+  async function runComparison(){
+    if(!state.trackedRequest) return;
+    try{
+      const c = await api(`/requests/${state.trackedRequest.id}/match-comparison`);
+      state.comparison = c;
+      renderComparison();
+    } catch(e){
+      toast(e.message, true);
+    }
+  }
+
+  async function refreshAssignments(){
+    try {
+      state.assignments = await api('/assignments');
+      renderLedger();
+    } catch(e){ /* keep last known state on transient failure */ }
+  }
+
+  async function pollOnce(){
+    try{
+      const [drivers] = await Promise.all([
+        api('/drivers'),
+        refreshAssignments(),
+      ]);
+      state.drivers = drivers;
+      renderFleet();
+
+      if(state.trackedRequest){
+        try{
+          const r = await api(`/requests/${state.trackedRequest.id}`);
+          state.trackedRequest = r;
+          renderTracked();
+        } catch(e){ /* keep last known */ }
+      }
+
+      $('liveDot').classList.remove('off');
+      $('liveLabel').textContent = 'live';
+      $('lastPoll').textContent = new Date().toLocaleTimeString();
+    } catch(e){
+      $('liveDot').classList.add('off');
+      $('liveLabel').textContent = 'connection lost';
+    }
+  }
+
+  function startPolling(){
+    pollOnce();
+    state.timer = setInterval(() => { if(!state.paused) pollOnce(); }, POLL_MS);
+    // faster local re-render for countdown timers between polls
+    setInterval(() => { if(!state.paused) renderLedger(); }, 1000);
+  }
+
+  $('createBtn').addEventListener('click', createRequest);
+  $('trackBtn').addEventListener('click', trackById);
+  $('pauseBtn').addEventListener('click', () => {
+    state.paused = !state.paused;
+    $('pauseBtn').textContent = state.paused ? 'Resume' : 'Pause';
+    $('liveDot').classList.toggle('off', state.paused);
+    $('liveLabel').textContent = state.paused ? 'paused' : 'live';
+  });
+
+  startPolling();
+})();
+</script>
+</body>
+</html>
