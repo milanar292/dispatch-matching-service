@@ -34,4 +34,9 @@ public class AssignmentController {
     public AssignmentResponse confirm(@PathVariable UUID id) {
         return AssignmentResponse.from(assignmentService.confirm(id));
     }
+
+    @PatchMapping("/{id}/complete")
+    public AssignmentResponse complete(@PathVariable UUID id) {
+        return AssignmentResponse.from(assignmentService.complete(id));
+    }
 }

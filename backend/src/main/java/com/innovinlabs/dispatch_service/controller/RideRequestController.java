@@ -8,6 +8,7 @@ import com.innovinlabs.dispatch_service.service.RideRequestService;
 import org.springframework.http.HttpStatus;
 import org.springframework.web.bind.annotation.*;
 
+import java.util.List;
 import java.util.UUID;
 
 @RestController
@@ -31,6 +32,11 @@ public class RideRequestController {
     @GetMapping("/{id}")
     public RideRequestResponse getById(@PathVariable UUID id) {
         return RideRequestResponse.from(rideRequestService.getById(id));
+    }
+
+    @GetMapping
+    public List<RideRequestResponse> getAll() {
+        return rideRequestService.getAll().stream().map(RideRequestResponse::from).toList();
     }
 
     /**

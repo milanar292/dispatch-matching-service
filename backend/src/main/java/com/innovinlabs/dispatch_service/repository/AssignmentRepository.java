@@ -10,4 +10,8 @@ import java.util.UUID;
 
 public interface AssignmentRepository extends JpaRepository<Assignment, UUID> {
     List<Assignment> findByStatusAndExpiresAtBefore(AssignmentStatus status, LocalDateTime time);
+
+    List<Assignment> findByDriverIdAndStatus(UUID driverId, AssignmentStatus status);
+
+    long countByRequestIdAndStatus(UUID requestId, AssignmentStatus status);
 }
