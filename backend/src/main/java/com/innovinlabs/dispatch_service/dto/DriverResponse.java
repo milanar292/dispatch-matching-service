@@ -12,12 +12,13 @@ public record DriverResponse(
         DriverStatus status,
         Double latitude,
         Double longitude,
-        LocalDateTime locationUpdatedAt
+        LocalDateTime locationUpdatedAt,
+        LocalDateTime availableSince
 ) {
     public static DriverResponse from(Driver d) {
         return new DriverResponse(
                 d.getId(), d.getName(), d.getStatus(),
-                d.getLatitude(), d.getLongitude(), d.getLocationUpdatedAt()
+                d.getLatitude(), d.getLongitude(), d.getLocationUpdatedAt(), d.getAvailableSince()
         );
     }
 }

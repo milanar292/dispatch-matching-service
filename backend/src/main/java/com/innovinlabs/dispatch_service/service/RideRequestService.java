@@ -7,6 +7,7 @@ import com.innovinlabs.dispatch_service.exception.NotFoundException;
 import com.innovinlabs.dispatch_service.repository.RideRequestRepository;
 import org.springframework.stereotype.Service;
 
+import java.util.List;
 import java.util.UUID;
 
 @Service
@@ -36,5 +37,9 @@ public class RideRequestService {
     public RideRequest getById(UUID id) {
         return rideRequestRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Request not found: " + id));
+    }
+
+    public List<RideRequest> getAll() {
+        return rideRequestRepository.findAll();
     }
 }

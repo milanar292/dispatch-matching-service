@@ -1,3 +1,9 @@
 package com.innovinlabs.dispatch_service.dto;
 
-public record LocationUpdateRequest(double latitude, double longitude) {}
+import java.time.LocalDateTime;
+
+public record LocationUpdateRequest(
+        double latitude,
+        double longitude,
+        LocalDateTime timestamp
+) {}

@@ -1,0 +1,425 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<title>Dispatch Matching Service — Demo Dashboard</title>
+<style>
+  :root {
+    --bg: #0f1420;
+    --panel: #171d2e;
+    --panel-border: #2a3348;
+    --text: #e6e9f0;
+    --muted: #8b93a7;
+    --accent: #4f8cff;
+    --green: #3ecf8e;
+    --amber: #f5a623;
+    --red: #ff5c5c;
+    --gray: #5a6478;
+  }
+  * { box-sizing: border-box; }
+  body {
+    background: var(--bg);
+    color: var(--text);
+    font-family: -apple-system, Segoe UI, Roboto, sans-serif;
+    margin: 0;
+    padding: 24px;
+  }
+  h1 { font-size: 20px; margin: 0 0 4px; }
+  .subtitle { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+  .grid {
+    display: grid;
+    grid-template-columns: 340px 1fr;
+    gap: 20px;
+    align-items: start;
+  }
+  .panel {
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    border-radius: 10px;
+    padding: 16px;
+    margin-bottom: 16px;
+  }
+  .panel h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.05em;
+    color: var(--muted);
+    margin: 0 0 12px;
+  }
+  label {
+    display: block;
+    font-size: 12px;
+    color: var(--muted);
+    margin: 10px 0 4px;
+  }
+  input, select {
+    width: 100%;
+    background: #0c101b;
+    border: 1px solid var(--panel-border);
+    color: var(--text);
+    padding: 8px 10px;
+    border-radius: 6px;
+    font-size: 13px;
+  }
+  button {
+    margin-top: 12px;
+    width: 100%;
+    background: var(--accent);
+    color: white;
+    border: none;
+    padding: 10px;
+    border-radius: 6px;
+    font-size: 13px;
+    font-weight: 600;
+    cursor: pointer;
+  }
+  button:hover { opacity: 0.9; }
+  .row-inline { display: flex; gap: 8px; }
+  .row-inline > div { flex: 1; }
+  table {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 13px;
+  }
+  th {
+    text-align: left;
+    color: var(--muted);
+    font-weight: 500;
+    padding: 6px 8px;
+    border-bottom: 1px solid var(--panel-border);
+    font-size: 11px;
+    text-transform: uppercase;
+  }
+  td {
+    padding: 8px;
+    border-bottom: 1px solid #1e2536;
+  }
+  .badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 20px;
+    font-size: 11px;
+    font-weight: 600;
+  }
+  .badge.AVAILABLE, .badge.CONFIRMED, .badge.DRIVER_CONFIRMED { background: rgba(62,207,142,0.15); color: var(--green); }
+  .badge.RESERVED, .badge.DRIVER_RESERVED, .badge.SEARCHING, .badge.REMATCHING { background: rgba(245,166,35,0.15); color: var(--amber); }
+  .badge.OFFLINE, .badge.CANCELLED { background: rgba(90,100,120,0.2); color: var(--gray); }
+  .badge.BUSY { background: rgba(79,140,255,0.15); color: var(--accent); }
+  .badge.TIMED_OUT, .badge.NO_DRIVER_AVAILABLE, .badge.DISCONNECTED { background: rgba(255,92,92,0.15); color: var(--red); }
+  .mono { font-family: "SF Mono", Consolas, monospace; font-size: 11px; color: var(--muted); }
+  .toast {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    background: var(--panel);
+    border: 1px solid var(--panel-border);
+    padding: 12px 16px;
+    border-radius: 8px;
+    font-size: 13px;
+    max-width: 340px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    z-index: 999;
+  }
+  .toast.error { border-color: var(--red); }
+  .toast.success { border-color: var(--green); }
+  .status-line { font-size: 12px; color: var(--muted); margin-top: 8px; }
+  .section-title { display: flex; justify-content: space-between; align-items: center; }
+  .refresh-indicator { font-size: 11px; color: var(--muted); }
+</style>
+</head>
+<body>
+
+<h1>🚗 Dispatch Matching Service</h1>
+<div class="subtitle">Live demo dashboard — auto-refreshes every 3s — backend: http://localhost:8080</div>
+
+<div class="grid">
+
+  <div>
+    <div class="panel">
+      <h2>Create Vehicle + Driver</h2>
+      <label>Driver Name</label>
+      <input id="driverName" placeholder="e.g. Driver A" value="Driver A">
+      <div class="row-inline">
+        <div>
+          <label>Vehicle Type</label>
+          <select id="vehicleType">
+            <option>SEDAN</option>
+            <option>SUV</option>
+            <option>HATCHBACK</option>
+          </select>
+        </div>
+        <div>
+          <label>Capacity</label>
+          <input id="vehicleCapacity" type="number" value="4">
+        </div>
+      </div>
+      <label>Latitude</label>
+      <input id="driverLat" value="12.9716">
+      <label>Longitude</label>
+      <input id="driverLng" value="77.5946">
+      <button onclick="createDriver()">Create Driver (Available)</button>
+    </div>
+
+    <div class="panel">
+      <h2>Update Driver</h2>
+      <label>Driver ID</label>
+      <input id="updateDriverId" placeholder="paste driver id, or click a row →">
+      <div class="row-inline">
+        <div>
+          <label>Latitude</label>
+          <input id="updateLat" value="12.9716">
+        </div>
+        <div>
+          <label>Longitude</label>
+          <input id="updateLng" value="77.5946">
+        </div>
+      </div>
+      <label>Status</label>
+      <select id="updateStatus">
+        <option>AVAILABLE</option>
+        <option>OFFLINE</option>
+        <option>DISCONNECTED</option>
+        <option>BUSY</option>
+      </select>
+      <button onclick="updateDriver()">Update Location + Status</button>
+    </div>
+
+    <div class="panel">
+      <h2>Submit Ride Request</h2>
+      <label>Rider ID</label>
+      <input id="riderId" value="rider-demo">
+      <div class="row-inline">
+        <div>
+          <label>Pickup Lat</label>
+          <input id="pickupLat" value="12.9718">
+        </div>
+        <div>
+          <label>Pickup Lng</label>
+          <input id="pickupLng" value="77.5948">
+        </div>
+      </div>
+      <div class="row-inline">
+        <div>
+          <label>Dropoff Lat</label>
+          <input id="dropoffLat" value="12.99">
+        </div>
+        <div>
+          <label>Dropoff Lng</label>
+          <input id="dropoffLng" value="77.60">
+        </div>
+      </div>
+      <button onclick="submitRequest()">Submit Request (auto-matches)</button>
+    </div>
+
+    <div class="panel">
+      <h2>Confirm Assignment</h2>
+      <label>Assignment ID</label>
+      <input id="confirmAssignmentId" placeholder="paste assignment id, or click a row →">
+      <button onclick="confirmAssignment()">Confirm Assignment</button>
+      <div class="status-line">Tip: click any row in the Assignments table to auto-fill this field.</div>
+    </div>
+  </div>
+
+  <div>
+    <div class="panel">
+      <div class="section-title">
+        <h2>Drivers</h2>
+        <span class="refresh-indicator" id="driverRefreshTime"></span>
+      </div>
+      <table id="driversTable">
+        <thead>
+          <tr><th>Name</th><th>Status</th><th>Lat</th><th>Lng</th><th>Location Updated</th><th>ID</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+
+    <div class="panel">
+      <div class="section-title">
+        <h2>Assignments</h2>
+        <span class="refresh-indicator" id="assignmentRefreshTime"></span>
+      </div>
+      <table id="assignmentsTable">
+        <thead>
+          <tr><th>Status</th><th>Driver</th><th>Reserved</th><th>Expires</th><th>Confirmed</th><th>ID</th></tr>
+        </thead>
+        <tbody></tbody>
+      </table>
+    </div>
+  </div>
+
+</div>
+
+<script>
+const API = "http://localhost:8080";
+let driverCache = {};
+
+function toast(msg, type) {
+  const el = document.createElement("div");
+  el.className = "toast " + (type || "");
+  el.textContent = msg;
+  document.body.appendChild(el);
+  setTimeout(() => el.remove(), 4000);
+}
+
+async function api(path, method, body) {
+  try {
+    const res = await fetch(API + path, {
+      method: method || "GET",
+      headers: body ? { "Content-Type": "application/json" } : {},
+      body: body ? JSON.stringify(body) : undefined
+    });
+    const text = await res.text();
+    let data;
+    try { data = JSON.parse(text); } catch { data = text; }
+    if (!res.ok) {
+      const msg = (data && data.error) ? data.error : (res.status + " " + res.statusText);
+      toast(msg, "error");
+      throw new Error(msg);
+    }
+    return data;
+  } catch (e) {
+    if (!e.message || !e.message.includes(" ")) toast("Network error — is the backend running on :8080?", "error");
+    throw e;
+  }
+}
+
+async function createDriver() {
+  const name = document.getElementById("driverName").value;
+  const type = document.getElementById("vehicleType").value;
+  const capacity = parseInt(document.getElementById("vehicleCapacity").value);
+  const lat = parseFloat(document.getElementById("driverLat").value);
+  const lng = parseFloat(document.getElementById("driverLng").value);
+
+  try {
+    const vehicle = await api("/vehicles", "POST", { type, capacity });
+    const driver = await api("/drivers", "POST", { name, vehicleId: vehicle.id });
+    await api(`/drivers/${driver.id}/location`, "POST", { latitude: lat, longitude: lng });
+    await api(`/drivers/${driver.id}/status`, "PATCH", { status: "AVAILABLE" });
+    toast(`Created ${name} (${driver.id.slice(0,8)}...) — AVAILABLE`, "success");
+    document.getElementById("updateDriverId").value = driver.id;
+    refreshAll();
+  } catch (e) { /* toast already shown */ }
+}
+
+async function updateDriver() {
+  const id = document.getElementById("updateDriverId").value.trim();
+  if (!id) return toast("Enter a driver ID", "error");
+  const lat = parseFloat(document.getElementById("updateLat").value);
+  const lng = parseFloat(document.getElementById("updateLng").value);
+  const status = document.getElementById("updateStatus").value;
+  try {
+    await api(`/drivers/${id}/location`, "POST", { latitude: lat, longitude: lng });
+    await api(`/drivers/${id}/status`, "PATCH", { status });
+    toast("Driver updated", "success");
+    refreshAll();
+  } catch (e) {}
+}
+
+async function submitRequest() {
+  const body = {
+    riderId: document.getElementById("riderId").value,
+    pickupLat: parseFloat(document.getElementById("pickupLat").value),
+    pickupLng: parseFloat(document.getElementById("pickupLng").value),
+    dropoffLat: parseFloat(document.getElementById("dropoffLat").value),
+    dropoffLng: parseFloat(document.getElementById("dropoffLng").value)
+  };
+  try {
+    const req = await api("/requests", "POST", body);
+    toast(`Request ${req.id.slice(0,8)}... → ${req.status}`,
+          req.status === "DRIVER_RESERVED" ? "success" : "error");
+    refreshAll();
+  } catch (e) {}
+}
+
+async function confirmAssignment() {
+  const id = document.getElementById("confirmAssignmentId").value.trim();
+  if (!id) return toast("Enter an assignment ID", "error");
+  try {
+    await api(`/assignments/${id}/confirm`, "PATCH");
+    toast("Assignment CONFIRMED", "success");
+    refreshAll();
+  } catch (e) {}
+}
+
+function fillConfirmField(id) {
+  document.getElementById("confirmAssignmentId").value = id;
+  toast("Assignment ID copied to Confirm field", "success");
+}
+
+function fillUpdateField(id) {
+  document.getElementById("updateDriverId").value = id;
+  toast("Driver ID copied to Update field", "success");
+}
+
+function badge(status) {
+  return `<span class="badge ${status}">${status}</span>`;
+}
+
+function fmtTime(iso) {
+  if (!iso) return "—";
+  const d = new Date(iso);
+  return d.toLocaleTimeString();
+}
+
+async function refreshDrivers() {
+  try {
+    const drivers = await api("/drivers", "GET");
+    driverCache = {};
+    drivers.forEach(d => driverCache[d.id] = d);
+    const tbody = document.querySelector("#driversTable tbody");
+    tbody.innerHTML = drivers.map(d => `
+      <tr onclick="fillUpdateField('${d.id}')" style="cursor:pointer">
+        <td>${d.name}</td>
+        <td>${badge(d.status)}</td>
+        <td>${d.latitude ?? "—"}</td>
+        <td>${d.longitude ?? "—"}</td>
+        <td>${fmtTime(d.locationUpdatedAt)}</td>
+        <td class="mono">${d.id.slice(0,8)}...</td>
+      </tr>
+    `).join("");
+    document.getElementById("driverRefreshTime").textContent = "updated " + new Date().toLocaleTimeString();
+  } catch (e) {}
+}
+
+async function refreshAssignments() {
+  try {
+    const assignments = await api("/assignments", "GET");
+    renderAssignments(assignments);
+  } catch (e) {
+    document.querySelector("#assignmentsTable tbody").innerHTML =
+      `<tr><td colspan="6" class="mono">Could not load assignments — check backend is running.</td></tr>`;
+  }
+}
+
+function renderAssignments(list) {
+  const tbody = document.querySelector("#assignmentsTable tbody");
+  if (!list.length) {
+    tbody.innerHTML = `<tr><td colspan="6" class="mono">No assignments yet — submit a ride request to create one.</td></tr>`;
+    return;
+  }
+  const sorted = [...list].sort((a, b) => new Date(b.reservedAt) - new Date(a.reservedAt));
+  tbody.innerHTML = sorted.map(a => `
+    <tr onclick="fillConfirmField('${a.id}')" style="cursor:pointer">
+      <td>${badge(a.status)}</td>
+      <td>${(driverCache[a.driverId] || {}).name || a.driverId.slice(0,8)}</td>
+      <td>${fmtTime(a.reservedAt)}</td>
+      <td>${fmtTime(a.expiresAt)}</td>
+      <td>${fmtTime(a.confirmedAt)}</td>
+      <td class="mono">${a.id.slice(0,8)}...</td>
+    </tr>
+  `).join("");
+  document.getElementById("assignmentRefreshTime").textContent = "updated " + new Date().toLocaleTimeString();
+}
+
+function refreshAll() {
+  refreshDrivers();
+  refreshAssignments();
+}
+
+refreshAll();
+setInterval(refreshAll, 3000);
+</script>
+
+</body>
+</html>

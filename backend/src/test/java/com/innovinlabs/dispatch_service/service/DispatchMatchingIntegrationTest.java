@@ -1,5 +1,6 @@
 package com.innovinlabs.dispatch_service.service;
 
+import com.innovinlabs.dispatch_service.dto.LocationUpdateRequest;
 import com.innovinlabs.dispatch_service.entity.*;
 import com.innovinlabs.dispatch_service.repository.AssignmentRepository;
 import com.innovinlabs.dispatch_service.repository.DriverRepository;
@@ -44,6 +45,7 @@ class DispatchMatchingIntegrationTest {
     @Autowired private MatchingService matchingService;
     @Autowired private ReassignmentScheduler reassignmentScheduler;
     @Autowired private AssignmentService assignmentService;
+    @Autowired private DriverService driverService;
 
     @AfterEach
     void cleanUp() {
@@ -87,6 +89,9 @@ class DispatchMatchingIntegrationTest {
         int result1 = f1.get(5, TimeUnit.SECONDS);
         int result2 = f2.get(5, TimeUnit.SECONDS);
         executor.shutdown();
+
+        System.out.println("Thread 1 result: " + result1);
+        System.out.println("Thread 2 result: " + result2);
 
         assertEquals(1, result1 + result2,
                 "Exactly one of the two concurrent reservation attempts should succeed");
@@ -200,4 +205,146 @@ class DispatchMatchingIntegrationTest {
 
         assertThrows(IllegalStateException.class, () -> assignmentService.confirm(assignmentId));
     }
+        // ---------- 5. Out-of-order location updates ----------
+    @Test
+    @Transactional
+    void olderLocationUpdateCannotOverwriteNewerLocation() {
+        Vehicle vehicle = vehicleRepository.save(new Vehicle("SEDAN", 4));
+
+        Driver driver = new Driver("Driver Location Test", vehicle);
+        driver.setStatus(DriverStatus.AVAILABLE);
+
+        LocalDateTime newerTimestamp = LocalDateTime.now().minusMinutes(1);
+
+        driver.updateLocation(
+                12.9700,
+                77.5900,
+                newerTimestamp
+        );
+
+        driver = driverRepository.save(driver);
+
+        UUID driverId = driver.getId();
+
+        // Simulate an older GPS update arriving after the newer update.
+        LocalDateTime olderTimestamp = newerTimestamp.minusSeconds(30);
+
+        LocationUpdateRequest olderUpdate =
+                new LocationUpdateRequest(
+                        13.0000,
+                        77.6000,
+                        olderTimestamp
+                );
+
+        driverService.updateLocation(driverId, olderUpdate);
+
+        Driver reloaded = driverRepository.findById(driverId).orElseThrow();
+
+        assertEquals(12.9700, reloaded.getLatitude());
+        assertEquals(77.5900, reloaded.getLongitude());
+        assertEquals(newerTimestamp, reloaded.getLocationUpdatedAt());
+    }
+    // ---------- 6. Confirmation vs timeout race ----------
+@Test
+void confirmationAndTimeoutCannotBothWin() throws Exception {
+    Vehicle vehicle = vehicleRepository.save(new Vehicle("SEDAN", 4));
+
+    Driver driver = new Driver("Race Driver", vehicle);
+    driver.setStatus(DriverStatus.RESERVED);
+    driver.updateLocation(12.97, 77.59, LocalDateTime.now());
+    driver = driverRepository.save(driver);
+
+    RideRequest request =
+            new RideRequest("race-rider", 12.97, 77.59, 13.00, 77.60);
+    request.setStatus(RequestStatus.DRIVER_RESERVED);
+    request = rideRequestRepository.save(request);
+
+    // Already expired so the timeout path is eligible.
+    Assignment assignment =
+            new Assignment(
+                    request,
+                    driver,
+                    LocalDateTime.now().minusSeconds(1)
+            );
+
+    assignment.setStatus(AssignmentStatus.RESERVED);
+    assignment = assignmentRepository.saveAndFlush(assignment);
+
+    UUID assignmentId = assignment.getId();
+
+    ExecutorService executor = Executors.newFixedThreadPool(2);
+
+    CountDownLatch startLatch = new CountDownLatch(1);
+
+    Callable<String> confirmAttempt = () -> {
+        startLatch.await();
+
+        try {
+            assignmentService.confirm(assignmentId);
+            return "CONFIRMED";
+        } catch (Exception e) {
+            return "CONFIRM_FAILED";
+        }
+    };
+
+    Callable<String> timeoutAttempt = () -> {
+        startLatch.await();
+
+        try {
+            reassignmentScheduler.reapExpiredAssignments();
+            return "TIMEOUT_COMPLETED";
+        } catch (Exception e) {
+            return "TIMEOUT_FAILED";
+        }
+    };
+
+    Future<String> confirmResult = executor.submit(confirmAttempt);
+    Future<String> timeoutResult = executor.submit(timeoutAttempt);
+
+    // Release both threads at approximately the same time.
+    startLatch.countDown();
+
+    String confirmation = confirmResult.get(5, TimeUnit.SECONDS);
+    String timeout = timeoutResult.get(5, TimeUnit.SECONDS);
+
+    executor.shutdown();
+
+    System.out.println("Confirmation result: " + confirmation);
+    System.out.println("Timeout result: " + timeout);
+
+    Assignment finalAssignment =
+            assignmentRepository.findById(assignmentId).orElseThrow();
+
+    /*
+     * The assignment must end in exactly one terminal state.
+     * CONFIRMED and TIMED_OUT must never both effectively win.
+     */
+    assertTrue(
+            finalAssignment.getStatus() == AssignmentStatus.CONFIRMED
+                    || finalAssignment.getStatus() == AssignmentStatus.TIMED_OUT,
+            "Assignment must end in CONFIRMED or TIMED_OUT"
+    );
+
+    if (finalAssignment.getStatus() == AssignmentStatus.CONFIRMED) {
+        Driver finalDriver =
+                driverRepository.findById(driver.getId()).orElseThrow();
+
+        assertEquals(
+                DriverStatus.BUSY,
+                finalDriver.getStatus(),
+                "Confirmed assignment must leave driver BUSY"
+        );
+    }
+
+    if (finalAssignment.getStatus() == AssignmentStatus.TIMED_OUT) {
+        Driver finalDriver =
+                driverRepository.findById(driver.getId()).orElseThrow();
+
+        assertNotEquals(
+                DriverStatus.BUSY,
+                finalDriver.getStatus(),
+                "Timed-out assignment must not leave driver BUSY"
+        );
+    }
+}
 }

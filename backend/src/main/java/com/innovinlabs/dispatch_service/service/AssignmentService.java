@@ -53,6 +53,34 @@ public class AssignmentService {
         return assignment;
     }
 
+    // Closes the loop that was previously missing: nothing else in the system
+    // ever moved a driver out of BUSY, so once a trip was confirmed that
+    // driver was permanently removed from the matching pool. This is the
+    // rider-drop-off / trip-completion step — it's the only path that should
+    // ever flip a driver from BUSY back to AVAILABLE.
+    @Transactional
+    public Assignment complete(UUID assignmentId) {
+        Assignment assignment = assignmentRepository.findById(assignmentId)
+                .orElseThrow(() -> new NotFoundException("Assignment not found: " + assignmentId));
+
+        if (assignment.getStatus() != AssignmentStatus.CONFIRMED) {
+            throw new IllegalStateException("Assignment is not in a completable state: " + assignment.getStatus());
+        }
+
+        assignment.setStatus(AssignmentStatus.COMPLETED);
+        assignmentRepository.save(assignment);
+
+        Driver driver = assignment.getDriver();
+        driver.setStatus(DriverStatus.AVAILABLE);
+        driverRepository.save(driver);
+
+        RideRequest request = assignment.getRequest();
+        request.setStatus(RequestStatus.COMPLETED);
+        rideRequestRepository.save(request);
+
+        return assignment;
+    }
+
     public Assignment getById(UUID id) {
         return assignmentRepository.findById(id)
                 .orElseThrow(() -> new NotFoundException("Assignment not found: " + id));
