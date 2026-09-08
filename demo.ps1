@@ -1,12 +1,12 @@
-﻿function Refresh-DriverLocation($driverId, $lat, $lng) {
+function Refresh-DriverLocation($driverId, $lat, $lng) {
     $body = @{ latitude = $lat; longitude = $lng; timestamp = (Get-Date).ToString("yyyy-MM-ddTHH:mm:ss") } | ConvertTo-Json
     Invoke-RestMethod -Uri "http://localhost:8080/drivers/$driverId/location" -Method Post -Body $body -ContentType "application/json" | Out-Null
 }
 
 Write-Host "Refreshing driver locations..."
-Refresh-DriverLocation "000ba88b-37ac-4f0b-b094-e9dd714d5eda" 13.91 78.91
-Refresh-DriverLocation "27a6b87e-7315-453f-9a46-078e6615d934" 13.93 78.87
-Refresh-DriverLocation "fdfd7e9b-7269-44c2-96f4-35bd4bcbaada" 13.88 78.94
+Refresh-DriverLocation "a54b1d2a-8ebe-4479-8863-8db91424fffb" 13.91 78.91
+Refresh-DriverLocation "8db89663-6b90-40a4-afff-f15ca0ae97b5" 13.93 78.87
+Refresh-DriverLocation "702560f3-68a4-42bf-aee8-d3dc365fcdff" 13.88 78.94
 
 $requestBody = @{ riderId = "rider-live-demo"; pickupLat = 13.90; pickupLng = 78.90; dropoffLat = 14.00; dropoffLng = 79.00 } | ConvertTo-Json
 $request = Invoke-RestMethod -Uri "http://localhost:8080/requests" -Method Post -Body $requestBody -ContentType "application/json"
