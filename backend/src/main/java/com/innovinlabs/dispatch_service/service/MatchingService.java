@@ -9,6 +9,7 @@ import com.innovinlabs.dispatch_service.repository.DriverRepository;
 import com.innovinlabs.dispatch_service.repository.RideRequestRepository;
 import com.innovinlabs.dispatch_service.routing.RoutingEstimate;
 import com.innovinlabs.dispatch_service.routing.RoutingService;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
@@ -38,15 +39,18 @@ public class MatchingService {
     private final RideRequestRepository rideRequestRepository;
     private final AssignmentRepository assignmentRepository;
     private final RoutingService routingService;
+    private final double nearbyRadiusMeters;
 
     public MatchingService(DriverRepository driverRepository,
                             RideRequestRepository rideRequestRepository,
                             AssignmentRepository assignmentRepository,
-                            RoutingService routingService) {
+                            RoutingService routingService,
+                            @Value("${dispatch.matching.nearby-radius-meters:10000}") double nearbyRadiusMeters) {
         this.driverRepository = driverRepository;
         this.rideRequestRepository = rideRequestRepository;
         this.assignmentRepository = assignmentRepository;
         this.routingService = routingService;
+        this.nearbyRadiusMeters = nearbyRadiusMeters;
     }
 
     @Transactional
@@ -81,21 +85,8 @@ public class MatchingService {
     private List<Driver> eligibleDriversSortedByDistance(RideRequest request) {
         LocalDateTime staleThreshold = LocalDateTime.now().minusSeconds(MAX_LOCATION_STALENESS_SECONDS);
 
-        List<Driver> candidates = driverRepository.findByStatus(DriverStatus.AVAILABLE);
-
-        candidates.removeIf(d -> d.getLatitude() == null || d.getLongitude() == null);
-        candidates.removeIf(d -> d.getLocationUpdatedAt() == null
-                || d.getLocationUpdatedAt().isBefore(staleThreshold));
-
-        candidates.sort(
-                Comparator.comparingDouble((Driver d) ->
-                                distanceKm(request.getPickupLat(), request.getPickupLng(), d.getLatitude(), d.getLongitude()))
-                        // Tie-breaker: when two drivers are equally close, the one who's been
-                        // AVAILABLE longest wins — spreads work around instead of one driver
-                        // always winning ties near a busy pickup point.
-                        .thenComparing(Driver::getAvailableSince, Comparator.nullsFirst(Comparator.naturalOrder())));
-
-        return candidates;
+        return driverRepository.findNearbyAvailableDrivers(
+                request.getPickupLat(), request.getPickupLng(), nearbyRadiusMeters, staleThreshold);
     }
 
     /**

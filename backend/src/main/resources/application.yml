@@ -19,6 +19,10 @@ spring:
     enabled: true
     locations: classpath:db/migration
 
+dispatch:
+  matching:
+    nearby-radius-meters: 10000
+
 server:
   port: 8080
   error:
